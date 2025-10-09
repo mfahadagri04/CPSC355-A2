@@ -716,7 +716,7 @@ int generateReport(const ShipmentManager *manager, const char *filename) {
     fprintf(fp, "Total Bamboo Units: %lld\n\n", totalQtyAll);
 
     // Bamboo stock by type
-    fprintf(fp, "Total bamboo stock:\n");
+    fprintf(fp, "TOTAL BAMBOO STOCK:\n");
     for (int t = 0; t < 10; ++t) {
         fprintf(fp, "Type %d: %d\n", t, typeTotals[t]);
     }
@@ -736,7 +736,7 @@ int generateReport(const ShipmentManager *manager, const char *filename) {
     fprintf(fp, "\n\n");
 
     // Supplier stats with percentages
-    fprintf(fp, "Supplier statistics:\n");
+    fprintf(fp, "SUPPLIER STATISTICS:\n");
     if (supCount == 0) {
         fprintf(fp, "N/A\n");
     } else {
