@@ -20,28 +20,33 @@ int main() {
     int user_input;
 
     while (1) {
-        printf("\n <============ Menu ============>\n");
-        printf("1. Read Shipments\n");
-        printf("2. Add new Shipments\n");
-        printf("3. Remove Old/Spoiled Shipments\n");
-        printf("4. Search Shipments\n");
-        printf("5. Sort Shipments\n");
-        printf("6. Generate a Report\n");
-        printf("7. Exit\n");
-        
-        printf("\n Enter your choice: ");
-        scanf("%d", &user_input);
-        if (user_input == 7) {
-            printf("Exiting the program. Goodbye!\n");
-            break;
-        } else if (user_input < 1 || user_input > 7) {
-            printf("Invalid choice. Please try again.\n");
-            continue;
-        } else {
-            // Valid input, break the loop to process
-            break;
-        }
+    printf("\n<============ Menu ============>\n");
+    printf("1. Read Shipments\n");
+    printf("2. Add new Shipments\n");
+    printf("3. Remove Old/Spoiled Shipments\n");
+    printf("4. Search Shipments\n");
+    printf("5. Sort Shipments\n");
+    printf("6. Generate a Report\n");
+    printf("7. Exit\n");
+    
+    printf("\nEnter your choice: ");
+    
+    if (scanf("%d", &user_input) != 1) {
+        printf("\nInvalid input! Please enter a number.\n");
+        while (getchar() != '\n'); 
+        continue;
     }
+    
+    if (user_input == 7) {
+        printf("Exiting the program. Goodbye!\n");
+        break;
+    } else if (user_input < 1 || user_input > 7) {
+        printf("\nInvalid choice. Please try again.\n");
+        continue;
+    } else {
+        break;
+    }
+}
 
     switch (user_input) {
         case 1: ///
