@@ -30,7 +30,7 @@ int appendShipmentToFile(const MyShipments *s, const char *filename);
 int saveShipments(const ShipmentManager *manager, const char *filename);
 
 void addNewShipment(ShipmentManager *manager);
-int generateReport(const ShipmentManager *manager, const char *filename);
+// int generateReport(const ShipmentManager *manager, const char *filename);
 
 void removeSpoiledShipments(ShipmentManager *manager);
 void print_shipments_numbered(const ShipmentManager *m);
@@ -718,18 +718,9 @@ int main(void) {
                 printf("Sort Shipments: TODO\n");
                 break;
 
-            case 7: { // Generate Report
-                if (manager->countOfShipments == 0) {
-                    printf("No shipments in memory. Read (1) or Add (2) first.\n");
-                    break;
-                }
-                const char *out = "report.txt";
-                if (generateReport(manager, out) == 0)
-                    printf("✓ Report generated: '%s'\n", out);
-                else
-                    printf("⚠ Failed to generate report.\n");
-                break;
-            }
+            case 7:
+                printf("Generate Report: TODO\n");
+                break; 
 
             case 8:
                 printf("Exiting the program. Goodbye!\n");
