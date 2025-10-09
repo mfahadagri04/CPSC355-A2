@@ -35,6 +35,10 @@ int generateReport(const ShipmentManager *manager, const char *filename);
 void removeSpoiledShipments(ShipmentManager *manager);
 void print_shipments_numbered(const ShipmentManager *m);
 
+void searchShipments(const ShipmentManager *manager);
+
+void sortShipments(ShipmentManager *manager);
+
 // ============ IMPLEMENTATION ============ //
 ShipmentManager *create_manager(int initialCapacity) {
     if (initialCapacity < 1) initialCapacity = 1;
@@ -58,6 +62,8 @@ void clear_shipments(ShipmentManager *m) {
     m->countOfShipments = 0; // keep capacity/buffer; just reset count
 }
 
+
+// Validate date format "YYYY-MM-DD"
 static int valid_date_yyyy_mm_dd(const char *s) {
     if (!s) {
         printf("Invalid date: (null) pointer.\n");
@@ -96,6 +102,8 @@ static int valid_date_yyyy_mm_dd(const char *s) {
 
     return 1;
 }
+
+// ----------------------------------------------- LOAD & READ SHIPMENTS -----------------------------------------------
 
 // Read Shipments from a file (append into in-memory array)
 int readShipments(ShipmentManager *manager, const char *filename) {
@@ -164,6 +172,7 @@ int readShipments(ShipmentManager *manager, const char *filename) {
     return loaded_count;
 }
 
+// Print all shipments in a table
 void print_shipments(const ShipmentManager *m) {
     if (m->countOfShipments == 0) {
         printf("\nNo shipments loaded.\n");
@@ -179,6 +188,8 @@ void print_shipments(const ShipmentManager *m) {
                s->bambooType, s->quantity, s->expiry_date, s->supplierID);
     }
 }
+
+// ----------------------------------------------- ADD & SAVE SHIPMENTS -----------------------------------------------
 
 // Append a single shipment to the end of the file (no overwrite)
 int appendShipmentToFile(const MyShipments *s, const char *filename) {
@@ -200,7 +211,7 @@ int appendShipmentToFile(const MyShipments *s, const char *filename) {
     return 0;
 }
 
-// Optional "Save All" (overwrite)
+// "Save All" (overwrite)
 int saveShipments(const ShipmentManager *manager, const char *filename) {
     FILE *fp = fopen(filename, "w");  // overwrite with current list
     if (!fp) { printf("Error: could not open '%s' for writing.\n", filename); return -1; }
@@ -212,6 +223,7 @@ int saveShipments(const ShipmentManager *manager, const char *filename) {
     return manager->countOfShipments;
 }
 
+// Add a new shipment via user input
 void addNewShipment(ShipmentManager *manager) {
     int type, qty, supplier;
     char date[20];
@@ -283,6 +295,7 @@ void addNewShipment(ShipmentManager *manager) {
     }
 }
 
+// Print the shipments with numbering for user selection
 void print_shipments_numbered(const ShipmentManager *m) {
     if (!m || m->countOfShipments == 0) {
         printf("\nNo shipments loaded.\n");
@@ -313,6 +326,9 @@ static void maybe_shrink_buffer(ShipmentManager *m) {
     }
 }
 
+// ----------------------------------------------- REMOVING SHIPMENTS -----------------------------------------------
+
+// Remove spoiled shipments by user selection
 void removeSpoiledShipments(ShipmentManager *manager) {
     if (!manager || manager->countOfShipments == 0) {
         printf("\nNo shipments to remove. Read (1) or Add (2) first.\n");
@@ -386,105 +402,239 @@ void removeSpoiledShipments(ShipmentManager *manager) {
     printf("\nNote: Deletions are in-memory. Use option 3 (Save Shipments to File - overwrite) to persist.\n");
 }
 
-// Report generation
-typedef struct {
-    int supplierID;
-    int totalQty;
-} SupplierStat;
+// ----------------------------------------------- SEARCH -----------------------------------------------
 
-static int cmp_type_desc(const void *a, const void *b) {
-    const int *pa = (const int *)a;   // [type, qty]
-    const int *pb = (const int *)b;
-    if (pb[1] != pa[1]) return pb[1] - pa[1];  // qty desc
-    return pa[0] - pb[0];                      // type asc
+// Date comparison helper
+static int compare_dates(const char *date1, const char *date2) {
+    // Compare dates in YYYY-MM-DD format lexicographically
+    return strcmp(date1, date2);
 }
 
-static int cmp_supplier_desc(const void *a, const void *b) {
-    const SupplierStat *sa = (const SupplierStat *)a;
-    const SupplierStat *sb = (const SupplierStat *)b;
-    return (sb->totalQty - sa->totalQty);      // qty desc
-}
-
-int generateReport(const ShipmentManager *manager, const char *filename) {
-    if (!manager) return -1;
-
-    // Accumulate totals by bamboo type
-    int typeTotals[10] = {0};
-    long long totalQtyAll = 0;
-
-    // Accumulate per-supplier totals (dynamic array)
-    SupplierStat *sup = NULL;
-    int supCount = 0, supCap = 0;
-
+// Search by type helper
+static void search_by_type(const ShipmentManager *manager) {
+    int type;
+    printf("\nEnter Bamboo Type to search (0-9): ");
+    if (scanf("%d", &type) != 1 || type < 0 || type > 9) {
+        printf("Invalid bamboo type.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+    
+    printf("\n<============ SEARCH RESULTS: Bamboo Type %d ============>\n", type);
+    int found = 0;
+    
+    printf("\n%-8s %-8s %-12s %-10s\n", "Type", "Quantity", "Expiry", "Supplier");
+    printf("----------------------------------------\n");
+    
     for (int i = 0; i < manager->countOfShipments; ++i) {
         const MyShipments *s = &manager->shipments[i];
-        if (s->bambooType >= 0 && s->bambooType <= 9 && s->quantity > 0) {
-            typeTotals[s->bambooType] += s->quantity;
-            totalQtyAll += s->quantity;
-        }
-        // find or create supplier entry
-        int found = -1;
-        for (int j = 0; j < supCount; ++j) {
-            if (sup[j].supplierID == s->supplierID) { found = j; break; }
-        }
-        if (found == -1) {
-            if (supCount == supCap) {
-                supCap = supCap ? supCap * 2 : 8;
-                SupplierStat *nb = (SupplierStat *)realloc(sup, supCap * sizeof(*sup));
-                if (!nb) { free(sup); return -1; }
-                sup = nb;
-            }
-            sup[supCount].supplierID = s->supplierID;
-            sup[supCount].totalQty   = 0;
-            found = supCount++;
-        }
-        sup[found].totalQty += s->quantity;
-    }
-
-    // Build type pairs [type, qty] for sorting
-    int typePairs[10][2];
-    for (int t = 0; t < 10; ++t) { typePairs[t][0] = t; typePairs[t][1] = typeTotals[t]; }
-    qsort(typePairs, 10, sizeof(typePairs[0]), cmp_type_desc);
-
-    // Sort suppliers by total desc for nicer report
-    if (supCount > 1) qsort(sup, supCount, sizeof(SupplierStat), cmp_supplier_desc);
-
-    // Open report file (overwrite the report file itself)
-    FILE *fp = fopen(filename, "w");
-    if (!fp) { free(sup); printf("Error: could not open '%s' for writing.\n", filename); return -1; }
-
-    fprintf(fp, "Total bamboo stock:\n");
-    for (int t = 0; t < 10; ++t) {
-        fprintf(fp, "Type %d: %d\n", t, typeTotals[t]);
-    }
-
-    // Top 3 bamboo types
-    fprintf(fp, "Top 3 bamboo types: ");
-    int printed = 0;
-    for (int i = 0; i < 10 && printed < 3; ++i) {
-        if (typePairs[i][1] > 0) {
-            if (printed) fprintf(fp, ", ");
-            fprintf(fp, "%d", typePairs[i][0]);
-            printed++;
+        if (s->bambooType == type) {
+            printf("%-8d %-8d %-12s %-10d\n",
+                   s->bambooType, s->quantity, s->expiry_date, s->supplierID);
+            found++;
         }
     }
-    if (printed == 0) fprintf(fp, "N/A");
-    fprintf(fp, "\n");
-
-    // Supplier stats with percentages
-    fprintf(fp, "Supplier statistics:\n");
-    if (supCount == 0) {
-        fprintf(fp, "N/A\n");
+    
+    if (found == 0) {
+        printf("No shipments found for bamboo type %d.\n", type);
     } else {
-        for (int i = 0; i < supCount; ++i) {
-            double pct = (totalQtyAll > 0) ? (100.0 * sup[i].totalQty / (double)totalQtyAll) : 0.0;
-            fprintf(fp, "Supplier %d: %.1f%%\n", sup[i].supplierID, pct);
+        printf("\nTotal shipments found: %d\n", found);
+    }
+}
+
+// Search by supplier helper
+static void search_by_supplier(const ShipmentManager *manager) {
+    int supplier;
+    printf("\nEnter Supplier ID to search: ");
+    if (scanf("%d", &supplier) != 1) {
+        printf("Invalid supplier ID.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+    
+    printf("\n<============ SEARCH RESULTS: Supplier %d ============>\n", supplier);
+    int found = 0;
+    
+    printf("\n%-8s %-8s %-12s %-10s\n", "Type", "Quantity", "Expiry", "Supplier");
+    printf("----------------------------------------\n");
+    
+    for (int i = 0; i < manager->countOfShipments; ++i) {
+        const MyShipments *s = &manager->shipments[i];
+        if (s->supplierID == supplier) {
+            printf("%-8d %-8d %-12s %-10d\n",
+                   s->bambooType, s->quantity, s->expiry_date, s->supplierID);
+            found++;
         }
     }
+    
+    if (found == 0) {
+        printf("No shipments found for supplier %d.\n", supplier);
+    } else {
+        printf("\nTotal shipments found: %d\n", found);
+    }
+}
 
-    fclose(fp);
-    free(sup);
-    return 0;
+// Search by date range helper
+static void search_by_date_range(const ShipmentManager *manager) {
+    char startDate[20], endDate[20];
+    
+    printf("\nEnter Start Date (YYYY-MM-DD): ");
+    if (scanf("%19s", startDate) != 1 || !valid_date_yyyy_mm_dd(startDate)) {
+        printf("Invalid start date format.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    
+    printf("Enter End Date (YYYY-MM-DD): ");
+    if (scanf("%19s", endDate) != 1 || !valid_date_yyyy_mm_dd(endDate)) {
+        printf("Invalid end date format.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+    
+    if (compare_dates(startDate, endDate) > 0) {
+        printf("Error: Start date must be before or equal to end date.\n");
+        return;
+    }
+    
+    printf("\n<============ SEARCH RESULTS: Date Range %s to %s ============>\n", 
+           startDate, endDate);
+    int found = 0;
+    
+    printf("\n%-8s %-8s %-12s %-10s\n", "Type", "Quantity", "Expiry", "Supplier");
+    printf("----------------------------------------\n");
+    
+    for (int i = 0; i < manager->countOfShipments; ++i) {
+        const MyShipments *s = &manager->shipments[i];
+        if (compare_dates(s->expiry_date, startDate) >= 0 && 
+            compare_dates(s->expiry_date, endDate) <= 0) {
+            printf("%-8d %-8d %-12s %-10d\n",
+                   s->bambooType, s->quantity, s->expiry_date, s->supplierID);
+            found++;
+        }
+    }
+    
+    if (found == 0) {
+        printf("No shipments found in the date range.\n");
+    } else {
+        printf("\nTotal shipments found: %d\n", found);
+    }
+}
+
+// Main search function
+void searchShipments(const ShipmentManager *manager) {
+    if (!manager || manager->countOfShipments == 0) {
+        printf("\nNo shipments to search. Read (1) or Add (2) first.\n");
+        return;
+    }
+    
+    printf("\n<============ SEARCH SHIPMENTS ============>\n");
+    printf("[1] Search by Bamboo Type\n");
+    printf("[2] Search by Supplier ID\n");
+    printf("[3] Search by Date Range\n");
+    printf("\nEnter your choice (1-3): ");
+    
+    int choice;
+    if (scanf("%d", &choice) != 1 || choice < 1 || choice > 3) {
+        printf("Invalid choice.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+    
+    switch (choice) {
+        case 1:
+            search_by_type(manager);
+            break;
+        case 2:
+            search_by_supplier(manager);
+            break;
+        case 3:
+            search_by_date_range(manager);
+            break;
+    }
+}
+
+// ----------------------------------------------- SORTING -----------------------------------------------
+
+// Comparison functions for qsort
+static int cmp_quantity_desc(const void *a, const void *b) {
+    const MyShipments *sa = (const MyShipments *)a;
+    const MyShipments *sb = (const MyShipments *)b;
+    // Sort by quantity descending (biggest to smallest)
+    return sb->quantity - sa->quantity;
+}
+
+static int cmp_bamboo_type_asc(const void *a, const void *b) {
+    const MyShipments *sa = (const MyShipments *)a;
+    const MyShipments *sb = (const MyShipments *)b;
+    // Sort by bamboo type ascending (0-9)
+    return sa->bambooType - sb->bambooType;
+}
+
+static int cmp_date_asc(const void *a, const void *b) {
+    const MyShipments *sa = (const MyShipments *)a;
+    const MyShipments *sb = (const MyShipments *)b;
+    // Sort by date ascending (earliest to latest)
+    // strcmp works for YYYY-MM-DD format
+    return strcmp(sa->expiry_date, sb->expiry_date);
+}
+
+// Main sort function
+void sortShipments(ShipmentManager *manager) {
+    if (!manager || manager->countOfShipments == 0) {
+        printf("\nNo shipments to sort. Read (1) or Add (2) first.\n");
+        return;
+    }
+    
+    if (manager->countOfShipments == 1) {
+        printf("\nOnly one shipment exists. Nothing to sort.\n");
+        print_shipments(manager);
+        return;
+    }
+    
+    printf("\n<============ SORT SHIPMENTS ============>\n");
+    printf("[1] Sort by Quantity (Biggest to Smallest)\n");
+    printf("[2] Sort by Bamboo Type (0-9)\n");
+    printf("[3] Sort by Date (Earliest to Latest)\n");
+    printf("\nEnter your choice (1-3): ");
+    
+    int choice;
+    if (scanf("%d", &choice) != 1 || choice < 1 || choice > 3) {
+        printf("Invalid choice.\n");
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+        return;
+    }
+    int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+    
+    printf("\nSorting shipments");
+    
+    switch (choice) {
+        case 1:
+            printf(" by Quantity (Biggest to Smallest)...\n");
+            qsort(manager->shipments, manager->countOfShipments, 
+                  sizeof(MyShipments), cmp_quantity_desc);
+            break;
+        case 2:
+            printf(" by Bamboo Type (0-9)...\n");
+            qsort(manager->shipments, manager->countOfShipments, 
+                  sizeof(MyShipments), cmp_bamboo_type_asc);
+            break;
+        case 3:
+            printf(" by Date (Earliest to Latest)...\n");
+            qsort(manager->shipments, manager->countOfShipments, 
+                  sizeof(MyShipments), cmp_date_asc);
+            break;
+    }
+    
+    printf("Sorting complete!\n");
+    printf("\n<============ SORTED SHIPMENTS ============>\n");
+    print_shipments(manager);
+    
+    printf("\nNote: Sorting is in-memory. Use option 3 (Save Shipments to File) to persist the sorted order.\n");
 }
 
 // ============ MAIN ============ //
@@ -506,7 +656,7 @@ int main(void) {
         printf("[2] Add New Shipment\n");
         printf("[3] Save Shipments to File\n");
         printf("[4] Remove Old/Spoiled Shipments\n");
-        printf("[5] Search Shipments (TODO)\n");
+        printf("[5] Search Shipments\n");
         printf("[6] Sort Shipments (TODO)\n");
         printf("[7] Generate a Report\n");
         printf("[8] Exit\n");
@@ -561,7 +711,7 @@ int main(void) {
                 break;
 
             case 5:
-                printf("Search Shipments: TODO\n");
+                searchShipments(manager);
                 break;
 
             case 6:
