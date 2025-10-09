@@ -32,6 +32,9 @@ int saveShipments(const ShipmentManager *manager, const char *filename);
 void addNewShipment(ShipmentManager *manager);
 int generateReport(const ShipmentManager *manager, const char *filename);
 
+void removeSpoiledShipments(ShipmentManager *manager);
+void print_shipments_numbered(const ShipmentManager *m);
+
 // ============ IMPLEMENTATION ============ //
 ShipmentManager *create_manager(int initialCapacity) {
     if (initialCapacity < 1) initialCapacity = 1;
@@ -280,7 +283,110 @@ void addNewShipment(ShipmentManager *manager) {
     }
 }
 
-// ---------- Report (case 7) ----------
+void print_shipments_numbered(const ShipmentManager *m) {
+    if (!m || m->countOfShipments == 0) {
+        printf("\nNo shipments loaded.\n");
+        return;
+    }
+
+    printf("\n%-5s %-8s %-8s %-12s %-10s\n", "#", "Type", "Quantity", "Expiry", "Supplier");
+    printf("------------------------------------------------------\n");
+    for (int i = 0; i < m->countOfShipments; ++i) {
+        const MyShipments *s = &m->shipments[i];
+        printf("[%d]   %-8d %-8d %-12s %-10d\n",
+               i + 1, s->bambooType, s->quantity, s->expiry_date, s->supplierID);
+    }
+}
+
+// helper: optionally shrink backing array to free memory
+static void maybe_shrink_buffer(ShipmentManager *m) {
+    if (!m) return;
+    // shrink when usage < 50% and capacity is reasonably large
+    if (m->maxCapacity > 8 && m->countOfShipments < m->maxCapacity / 2) {
+        int newCap = m->maxCapacity / 2;
+        if (newCap < m->countOfShipments) newCap = m->countOfShipments;
+        MyShipments *nb = (MyShipments *)realloc(m->shipments, sizeof(MyShipments) * newCap);
+        if (nb) {
+            m->shipments = nb;
+            m->maxCapacity = newCap;
+        }
+    }
+}
+
+void removeSpoiledShipments(ShipmentManager *manager) {
+    if (!manager || manager->countOfShipments == 0) {
+        printf("\nNo shipments to remove. Read (1) or Add (2) first.\n");
+        return;
+    }
+
+    while (1) {
+        print_shipments_numbered(manager);
+
+        printf("\nEnter the number to delete (1-%d), or 0 to cancel: ",
+               manager->countOfShipments);
+
+        int choice;
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number.\n");
+            int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+            continue;
+        }
+        // clear trailing newline
+        int ch; while ((ch = getchar()) != '\n' && ch != EOF) {}
+
+        if (choice == 0) {
+            printf("Removal cancelled.\n");
+            return;
+        }
+        if (choice < 1 || choice > manager->countOfShipments) {
+            printf("Invalid selection. Choose between 1 and %d (or 0 to cancel).\n",
+                   manager->countOfShipments);
+            continue;
+        }
+
+        int idx = choice - 1;
+        MyShipments removed = manager->shipments[idx];
+
+        // shift left to fill the gap
+        for (int i = idx; i < manager->countOfShipments - 1; ++i) {
+            manager->shipments[i] = manager->shipments[i + 1];
+        }
+        manager->countOfShipments--;
+
+        // optional: zero the now-unused last slot (not required, but neat)
+        if (manager->countOfShipments >= 0) {
+            MyShipments *tail = &manager->shipments[manager->countOfShipments];
+            memset(tail, 0, sizeof(*tail));
+        }
+
+        // maybe shrink to free memory
+        maybe_shrink_buffer(manager);
+
+        printf("Deleted shipment: \n");
+        printf("Type = %d\n",removed.bambooType);
+        printf("Quantity = %d\n",removed.quantity);
+        printf("Date = %s\n",removed.expiry_date);
+        printf("Supplier ID = %d\n",removed.supplierID);
+
+        if (manager->countOfShipments == 0) {
+            printf("All shipments removed.\n");
+            break;
+        }
+
+        // ask if they want to delete more in the same session
+        printf("\nDelete another? (y/n): ");
+        int ans = getchar();
+        while (ans == '\n') ans = getchar();
+        int c2; while ((c2 = getchar()) != '\n' && c2 != EOF) {} // clear rest of line
+        if (ans != 'y' && ans != 'Y') break;
+    }
+
+    printf("\nUpdated Shipments List:\n");
+    print_shipments_numbered(manager);
+    printf("\nNote: Deletions are in-memory. Use option 3 (Save Shipments to File - overwrite) to persist.\n");
+}
+
+// Report generation
 typedef struct {
     int supplierID;
     int totalQty;
@@ -396,14 +502,14 @@ int main(void) {
     while (1) {
         int user_input;
         printf("\n<============ Menu ============>\n");
-        printf("1. Read Shipments (from shipments.txt)\n");
-        printf("2. Add New Shipment (append + autosave)\n");
-        printf("3. Save Shipments to File (overwrite)\n");
-        printf("4. Remove Old/Spoiled Shipments (TODO)\n");
-        printf("5. Search Shipments (TODO)\n");
-        printf("6. Sort Shipments (TODO)\n");
-        printf("7. Generate a Report\n");
-        printf("8. Exit\n");
+        printf("[1] Read Shipments\n");
+        printf("[2] Add New Shipment\n");
+        printf("[3] Save Shipments to File\n");
+        printf("[4] Remove Old/Spoiled Shipments\n");
+        printf("[5] Search Shipments (TODO)\n");
+        printf("[6] Sort Shipments (TODO)\n");
+        printf("[7] Generate a Report\n");
+        printf("[8] Exit\n");
         printf("\nEnter your choice: ");
 
         if (scanf("%d", &user_input) != 1) {
@@ -451,7 +557,7 @@ int main(void) {
             }
 
             case 4:
-                printf("Remove Old/Spoiled Shipments: TODO\n");
+                removeSpoiledShipments(manager);
                 break;
 
             case 5:
