@@ -1,0 +1,33 @@
+========================================
+   MOCHI'S BAMBOO INVENTORY REPORT
+========================================
+
+Total Shipments: 8
+Total Bamboo Units: 892
+
+Total bamboo stock:
+Type 0: 0
+Type 1: 65
+Type 2: 517
+Type 3: 0
+Type 4: 0
+Type 5: 180
+Type 6: 0
+Type 7: 30
+Type 8: 0
+Type 9: 100
+
+Top 3 bamboo types: 2, 5, 9
+
+Supplier statistics:
+Supplier 124: 28.0%
+Supplier 123: 24.9%
+Supplier 101: 16.3%
+Supplier 104: 11.2%
+Supplier 111: 11.2%
+Supplier 103: 5.0%
+Supplier 102: 3.4%
+
+========================================
+End of Report
+========================================

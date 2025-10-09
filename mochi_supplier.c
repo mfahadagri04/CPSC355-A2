@@ -30,7 +30,7 @@ int appendShipmentToFile(const MyShipments *s, const char *filename);
 int saveShipments(const ShipmentManager *manager, const char *filename);
 
 void addNewShipment(ShipmentManager *manager);
-// int generateReport(const ShipmentManager *manager, const char *filename);
+int generateReport(const ShipmentManager *manager, const char *filename);
 
 void removeSpoiledShipments(ShipmentManager *manager);
 void print_shipments_numbered(const ShipmentManager *m);
@@ -637,6 +637,120 @@ void sortShipments(ShipmentManager *manager) {
     printf("\nNote: Sorting is in-memory. Use option 3 (Save Shipments to File) to persist the sorted order.\n");
 }
 
+// ----------------------------------------------- GENERATING SHIPMENT REPORT -----------------------------------------------
+// Struct for supplier statistics (needed by generateReport)
+typedef struct {
+    int supplierID;
+    int totalQty;
+} SupplierStat;
+
+// Comparison function for sorting bamboo types by quantity (descending)
+static int cmp_type_desc(const void *a, const void *b) {
+    const int *pa = (const int *)a;   // [type, qty]
+    const int *pb = (const int *)b;
+    if (pb[1] != pa[1]) return pb[1] - pa[1];  // qty desc
+    return pa[0] - pb[0];                      // type asc
+}
+
+// Comparison function for sorting suppliers by quantity (descending)
+static int cmp_supplier_desc(const void *a, const void *b) {
+    const SupplierStat *sa = (const SupplierStat *)a;
+    const SupplierStat *sb = (const SupplierStat *)b;
+    return (sb->totalQty - sa->totalQty);      // qty desc
+}
+
+// Generating a report file
+int generateReport(const ShipmentManager *manager, const char *filename) {
+    if (!manager) return -1;
+
+    // Accumulate totals by bamboo type
+    int typeTotals[10] = {0};
+    long long totalQtyAll = 0;
+
+    // Accumulate per-supplier totals (dynamic array)
+    SupplierStat *sup = NULL;
+    int supCount = 0, supCap = 0;
+
+    for (int i = 0; i < manager->countOfShipments; ++i) {
+        const MyShipments *s = &manager->shipments[i];
+        if (s->bambooType >= 0 && s->bambooType <= 9 && s->quantity > 0) {
+            typeTotals[s->bambooType] += s->quantity;
+            totalQtyAll += s->quantity;
+        }
+        // find or create supplier entry
+        int found = -1;
+        for (int j = 0; j < supCount; ++j) {
+            if (sup[j].supplierID == s->supplierID) { found = j; break; }
+        }
+        if (found == -1) {
+            if (supCount == supCap) {
+                supCap = supCap ? supCap * 2 : 8;
+                SupplierStat *nb = (SupplierStat *)realloc(sup, supCap * sizeof(*sup));
+                if (!nb) { free(sup); return -1; }
+                sup = nb;
+            }
+            sup[supCount].supplierID = s->supplierID;
+            sup[supCount].totalQty   = 0;
+            found = supCount++;
+        }
+        sup[found].totalQty += s->quantity;
+    }
+
+    // Build type pairs [type, qty] for sorting
+    int typePairs[10][2];
+    for (int t = 0; t < 10; ++t) { typePairs[t][0] = t; typePairs[t][1] = typeTotals[t]; }
+    qsort(typePairs, 10, sizeof(typePairs[0]), cmp_type_desc);
+
+    // Sort suppliers by total desc for nicer report
+    if (supCount > 1) qsort(sup, supCount, sizeof(SupplierStat), cmp_supplier_desc);
+
+    // Open report file (overwrite the report file itself)
+    FILE *fp = fopen(filename, "w");
+    if (!fp) { free(sup); printf("Error: could not open '%s' for writing.\n", filename); return -1; }
+
+    // Header with summary
+    fprintf(fp, "========================================\n");
+    fprintf(fp, "   MOCHI'S BAMBOO INVENTORY REPORT\n");
+    fprintf(fp, "========================================\n\n");
+    fprintf(fp, "Total Shipments: %d\n", manager->countOfShipments);
+    fprintf(fp, "Total Bamboo Units: %lld\n\n", totalQtyAll);
+
+    // Bamboo stock by type
+    fprintf(fp, "Total bamboo stock:\n");
+    for (int t = 0; t < 10; ++t) {
+        fprintf(fp, "Type %d: %d\n", t, typeTotals[t]);
+    }
+    fprintf(fp, "\n");
+
+    // Top 3 bamboo types
+    fprintf(fp, "Top 3 bamboo types: ");
+    int printed = 0;
+    for (int i = 0; i < 10 && printed < 3; ++i) {
+        if (typePairs[i][1] > 0) {
+            if (printed) fprintf(fp, ", ");
+            fprintf(fp, "%d", typePairs[i][0]);
+            printed++;
+        }
+    }
+    if (printed == 0) fprintf(fp, "N/A");
+    fprintf(fp, "\n\n");
+
+    // Supplier stats with percentages
+    fprintf(fp, "Supplier statistics:\n");
+    if (supCount == 0) {
+        fprintf(fp, "N/A\n");
+    } else {
+        for (int i = 0; i < supCount; ++i) {
+            double pct = (totalQtyAll > 0) ? (100.0 * sup[i].totalQty / (double)totalQtyAll) : 0.0;
+            fprintf(fp, "Supplier %d: %.1f%%\n", sup[i].supplierID, pct);
+        }
+    }
+
+    fclose(fp);
+    free(sup);
+    return 0;
+}
+
 // ============ MAIN ============ //
 int main(void) {
     const char *filename = "shipments.txt";
@@ -657,7 +771,7 @@ int main(void) {
         printf("[3] Save Shipments to File\n");
         printf("[4] Remove Old/Spoiled Shipments\n");
         printf("[5] Search Shipments\n");
-        printf("[6] Sort Shipments (TODO)\n");
+        printf("[6] Sort Shipments\n");
         printf("[7] Generate a Report\n");
         printf("[8] Exit\n");
         printf("\nEnter your choice: ");
@@ -715,12 +829,21 @@ int main(void) {
                 break;
 
             case 6:
-                printf("Sort Shipments: TODO\n");
+                sortShipments(manager);
                 break;
 
-            case 7:
-                printf("Generate Report: TODO\n");
-                break; 
+            case 7: { // Generate Report
+                if (manager->countOfShipments == 0) {
+                    printf("No shipments in memory. Read (1) or Add (2) first.\n");
+                    break;
+                }
+                const char *out = "report.txt";
+                if (generateReport(manager, out) == 0)
+                    printf("Report generated: '%s'\n", out);
+                else
+                    printf("Failed to generate report.\n");
+                break;
+            }
 
             case 8:
                 printf("Exiting the program. Goodbye!\n");
