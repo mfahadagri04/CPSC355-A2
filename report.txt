@@ -8,17 +8,19 @@ Type 1: 0
 Type 2: 276
 Type 3: 0
 Type 4: 0
-Type 5: 135
-Type 6: 0
+Type 5: 0
+Type 6: 122
 Type 7: 0
-Type 8: 0
+Type 8: 123
 Type 9: 0
 
-Top 3 bamboo types: 2, 5
+Top 3 bamboo types: 2, 8, 6
 
 Supplier statistics:
-Supplier 34: 5.6%
-Supplier 109: 31.6%
-Supplier 123: 62.8%
+Supplier 34: 4.4%
+Supplier 101: 23.6%
+Supplier 109: 25.0%
+Supplier 123: 23.6%
+Supplier 198: 23.4%
 
 ========================================
