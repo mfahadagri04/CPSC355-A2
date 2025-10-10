@@ -459,7 +459,7 @@ int main() {
         printf("[6] Sort Shipments\n");
         printf("[7] Generate Report\n");
         printf("[8] Exit\n");
-        printf("Enter choice: ");
+        printf("\nEnter choice: ");
         
         int choice;
         if (scanf("%d", &choice) != 1) {
