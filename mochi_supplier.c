@@ -16,23 +16,6 @@ typedef struct {
     int capacity;
 } ShipmentManager;
 
-// ============ FUNCTION PROTOTYPES ============
-void initManager(ShipmentManager *manager, int size);
-void freeManager(ShipmentManager *manager);
-void clearShipments(ShipmentManager *manager);
-
-int readShipments(ShipmentManager *manager, const char *filename);
-void printShipments(const ShipmentManager *manager);
-int isValidDate(const char *date);
-
-void addNewShipment(ShipmentManager *manager);
-void saveShipments(const ShipmentManager *manager, const char *filename);
-
-void removeShipment(ShipmentManager *manager);
-void searchShipments(const ShipmentManager *manager);
-void sortShipments(ShipmentManager *manager);
-void generateReport(const ShipmentManager *manager, const char *filename);
-
 // ============ HELPER FUNCTIONS ============
 void clearInputBuffer() {
     int c;
@@ -464,7 +447,7 @@ int main() {
     ShipmentManager manager;
     initManager(&manager, 10);
     
-    printf("=== MOCHI'S BAMBOO SUPPLY MANAGER ===\n");
+    printf("=== MOCHI'S BAMBOO INVENTORY SYSTEM ===\n");
     
     while (1) {
         printf("\n--- MENU ---\n");
